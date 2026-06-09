@@ -44,6 +44,16 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
     }
     .btn-primary:hover { background-color: #f97316; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-outline {
+      background-color: transparent; color: #F4A261; font-weight: 500;
+      padding: 0.625rem 1.75rem; border-radius: 9999px;
+      border: 2px solid #F4A261; transition: all 0.2s; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .btn-outline:hover { background-color: #FEE8D5; }
+    .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .page-enter { animation: fadeIn 0.3s ease-in-out; }
     @keyframes fadeIn {
@@ -62,6 +72,7 @@
         0 6px 12px -6px rgba(80,50,30,0.14),
         0 0 0 1px rgba(180,140,90,0.07) inset;
       break-inside: avoid;
+      margin-bottom: 20px;
       animation: fadeIn 0.4s ease-in-out;
     }
     .note-tape {
@@ -121,6 +132,7 @@
         <div class="mt-5">
           <a href="game-heart.html" class="btn-primary">🌱 我也要選今天的初心</a>
         </div>
+        <p id="wallCount" class="hidden text-xs text-sub-text/80 mt-4"></p>
       </div>
 
       <!-- 載入中 -->
@@ -147,11 +159,16 @@
         <div class="text-3xl mb-3">😵</div>
         <p class="font-semibold text-warm-text mb-1">載入失敗</p>
         <p class="text-sm text-sub-text">請檢查網路，或稍後重新整理頁面。</p>
-        <button onclick="loadWall()" class="btn-primary mt-4">重新載入</button>
+        <button onclick="resetAndLoad()" class="btn-primary mt-4">重新載入</button>
       </div>
 
       <!-- 留言牆瀑布流 -->
       <div id="wall" class="hidden" style="column-gap: 20px; column-count: 1;"></div>
+
+      <!-- 載入更多 -->
+      <div id="moreWrap" class="hidden text-center mt-6">
+        <button id="loadMoreBtn" class="btn-outline">載入更多</button>
+      </div>
     </div>
   </main>
 
@@ -164,16 +181,18 @@
 
   <script>
     // ════════════════════════════════════════════════════════════
-    //  把下面這行換成你部署 Google Apps Script 後拿到的網址
-    //  （要和 game-heart.html 裡填的同一個網址）
+    //  Google Apps Script 網頁應用程式網址（與 game-heart.html 相同）
     // ════════════════════════════════════════════════════════════
     const WALL_API_URL = 'https://script.google.com/macros/s/AKfycbxoY-aDVPSx4X5X5tPC5ACSMHKSvZTEcAKNb_fIRW_8t6sp3fTD9NZJQjr6w0iWJuA/exec';
 
-    // 響應式欄數
+    const PAGE_SIZE = 60;   // 每次載入則數
+    let offset = 0;         // 已載入到第幾則
+    let total = 0;          // 總則數
+    let loadingPage = false;
+
     function setColumns() {
-      const wall = document.getElementById('wall');
       const w = window.innerWidth;
-      wall.style.columnCount = w >= 1024 ? 3 : (w >= 640 ? 2 : 1);
+      document.getElementById('wall').style.columnCount = w >= 1024 ? 3 : (w >= 640 ? 2 : 1);
     }
     window.addEventListener('resize', setColumns);
 
@@ -182,53 +201,88 @@
     }
 
     function show(id) {
-      ['loading','notConfigured','empty','error','wall'].forEach(x =>
+      ['loading','notConfigured','empty','error'].forEach(x =>
         document.getElementById(x).classList.toggle('hidden', x !== id));
     }
 
-    function renderWall(list) {
-      if (!list.length) { show('empty'); return; }
-      const wall = document.getElementById('wall');
-      wall.innerHTML = list.map(item => {
-        const values = (Array.isArray(item.values) ? item.values
-                        : String(item.values || '').split(/[、,，]/).filter(Boolean));
-        const pills = values.map(v => `<span class="value-pill">【${esc(v.replace(/[【】]/g,''))}】</span>`).join('');
-        return `
-          <div class="note-card" style="margin-bottom:20px;">
-            <div class="note-tape"></div>
-            <div class="text-center mb-3 mt-1">
-              <div class="inline-flex items-center gap-2 text-[11px]" style="color:#A87C50;font-style:italic;">
-                <span class="hand-line"></span>${esc(item.date || '')}<span class="hand-line"></span>
-              </div>
+    function cardHTML(item) {
+      const values = (Array.isArray(item.values) ? item.values
+                      : String(item.values || '').split(/[、,，]/).filter(Boolean));
+      const pills = values.map(v => `<span class="value-pill">【${esc(String(v).replace(/[【】]/g,''))}】</span>`).join('');
+      return `
+        <div class="note-card">
+          <div class="note-tape"></div>
+          <div class="text-center mb-3 mt-1">
+            <div class="inline-flex items-center gap-2 text-[11px]" style="color:#A87C50;font-style:italic;">
+              <span class="hand-line"></span>${esc(item.date || '')}<span class="hand-line"></span>
             </div>
-            <div class="mb-3 text-center">${pills}</div>
-            <p class="text-[14px] leading-relaxed text-warm-text mb-4" style="white-space:pre-wrap;">${esc(item.message)}</p>
-            <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-dashed border-amber-200">
-              <span style="font-size:13px;">🖊️</span>
-              <span class="text-[13px] font-semibold" style="color:#8B5E34;">${esc(item.name)}</span>
-            </div>
-          </div>`;
-      }).join('');
-      setColumns();
-      show('wall');
+          </div>
+          <div class="mb-3 text-center">${pills}</div>
+          <p class="text-[14px] leading-relaxed text-warm-text mb-4" style="white-space:pre-wrap;">${esc(item.message)}</p>
+          <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-dashed border-amber-200">
+            <span style="font-size:13px;">🖊️</span>
+            <span class="text-[13px] font-semibold" style="color:#8B5E34;">${esc(item.name)}</span>
+          </div>
+        </div>`;
     }
 
-    async function loadWall() {
+    function updateCountAndButton() {
+      const c = document.getElementById('wallCount');
+      c.textContent = `目前顯示最新 ${offset} 則，共 ${total} 則`;
+      c.classList.remove('hidden');
+      document.getElementById('moreWrap').classList.toggle('hidden', offset >= total);
+    }
+
+    async function loadPage() {
+      if (loadingPage) return;
       if (WALL_API_URL.indexOf('PASTE_YOUR') === 0) { show('notConfigured'); return; }
-      show('loading');
+      loadingPage = true;
+      const moreBtn = document.getElementById('loadMoreBtn');
+      const firstLoad = (offset === 0);
+      if (!firstLoad) { moreBtn.disabled = true; moreBtn.textContent = '載入中…'; }
+
       try {
-        const res = await fetch(WALL_API_URL + '?t=' + Date.now());
+        const url = `${WALL_API_URL}?limit=${PAGE_SIZE}&offset=${offset}&t=${Date.now()}`;
+        const res = await fetch(url);
         const data = await res.json();
-        // 後端回傳 { ok:true, list:[...] }，最新的在前
-        const list = (data.list || data || []).slice().reverse();
-        renderWall(list);
+        const list = data.list || [];
+        total = (typeof data.total === 'number') ? data.total : (offset + list.length);
+
+        if (firstLoad && list.length === 0) { show('empty'); loadingPage = false; return; }
+
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('wall').classList.remove('hidden');
+
+        const html = list.map(cardHTML).join('');
+        document.getElementById('wall').insertAdjacentHTML('beforeend', html);
+        offset += list.length;
+
+        setColumns();
+        updateCountAndButton();
       } catch (err) {
         console.error(err);
-        show('error');
+        if (firstLoad) show('error');
+        else alert('載入更多失敗，請稍後再試。');
+      } finally {
+        loadingPage = false;
+        moreBtn.disabled = false;
+        moreBtn.textContent = '載入更多';
       }
     }
 
-    loadWall();
+    function resetAndLoad() {
+      offset = 0; total = 0;
+      document.getElementById('wall').innerHTML = '';
+      document.getElementById('wall').classList.add('hidden');
+      document.getElementById('moreWrap').classList.add('hidden');
+      document.getElementById('wallCount').classList.add('hidden');
+      show('loading');
+      loadPage();
+    }
+
+    document.getElementById('loadMoreBtn').addEventListener('click', loadPage);
+
+    resetAndLoad();
   </script>
 </body>
 </html>
