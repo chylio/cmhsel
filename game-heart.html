@@ -587,14 +587,18 @@
         date: todayText()
       };
       try {
+        // no-cors：Apps Script 回應會轉址導致 CORS 讀取被擋，
+        // 用 no-cors 讓請求照常送達、資料照常存入，前端不讀回應即可。
         await fetch(WALL_API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 用 text/plain 避免 CORS 預檢
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
         document.getElementById('shareForm').classList.add('hidden');
         document.getElementById('shareSuccess').classList.remove('hidden');
       } catch (err) {
+        // 只有真正的網路錯誤才會走到這裡
         console.error(err);
         alert('送出失敗，請檢查網路或稍後再試。');
         submitShare.disabled = false;
