@@ -295,9 +295,9 @@
 
   <script>
     // ════════════════════════════════════════════════════════════
-    //  留言牆設定：把下面這行換成你部署 Google Apps Script 後拿到的網址
+    //  留言牆設定：Google Apps Script 網頁應用程式網址
     // ════════════════════════════════════════════════════════════
-    const WALL_API_URL = 'https://script.google.com/macros/s/AKfycby_T7yVbj6Pyr2fZ09CeSWBo0vGKtFqYpG4AFFP-Caf2ddZqFGb195JGCk0rZtayms/exec';
+    const WALL_API_URL = 'https://script.google.com/macros/s/AKfycbxoY-aDVPSx4X5X5tPC5ACSMHKSvZTEcAKNb_fIRW_8t6sp3fTD9NZJQjr6w0iWJuA/exec';
 
     // ── 初心價值（不分區，自行選擇）──────────────────────────
     const palette = [
@@ -535,10 +535,8 @@
     const shareMsgEl   = document.getElementById('shareMessage');
     const shareConsent = document.getElementById('shareConsent');
     const submitShare  = document.getElementById('submitShareBtn');
-    const shareHint    = document.getElementById('shareHint');
 
     function openShare() {
-      // 預覽目前選的初心
       const items = getSelectedItems();
       document.getElementById('shareValuesPreview').innerHTML =
         '你今天的初心：' + items.map(it => `<span class="font-bold text-warm-text">【${esc(it.name)}】</span>`).join('、');
@@ -598,7 +596,6 @@
         document.getElementById('shareForm').classList.add('hidden');
         document.getElementById('shareSuccess').classList.remove('hidden');
       } catch (err) {
-        // 只有真正的網路錯誤才會走到這裡
         console.error(err);
         alert('送出失敗，請檢查網路或稍後再試。');
         submitShare.disabled = false;
@@ -617,3 +614,4 @@
   </script>
 </body>
 </html>
+                                                                                                                                                                                   
