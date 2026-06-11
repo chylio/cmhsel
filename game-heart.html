@@ -279,6 +279,40 @@
             <span class="text-xs text-sub-text leading-relaxed">我同意將上述內容（稱呼、留言、所選初心）公開顯示在留言牆上。</span>
           </label>
 
+          <!-- ── 院內同仁抽獎（活動期間限定，由 LOTTERY_OPEN 控制顯示）── -->
+          <div id="lotterySection" class="hidden rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/40 p-4 space-y-3">
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+              <input id="joinLottery" type="checkbox" class="mt-0.5 w-4 h-4 accent-[#F4A261]" />
+              <span class="text-sm font-semibold text-warm-text leading-relaxed">🎁 我是奇美院內同仁，想參加抽獎</span>
+            </label>
+
+            <div id="lotteryFields" class="hidden space-y-3 pt-1">
+              <p class="text-[11px] text-sub-text leading-relaxed">以下資料<strong>僅供本次抽獎聯絡與資格核對</strong>，只會存於主辦單位後台、<strong>不會顯示在留言牆</strong>。</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-semibold text-warm-text mb-1">員工姓名 <span class="text-muted-orange">*</span></label>
+                  <input id="empName" type="text" maxlength="20" class="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-muted-orange focus:outline-none text-sm" />
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-semibold text-warm-text mb-1">人事號 <span class="text-muted-orange">*</span></label>
+                  <input id="empId" type="text" maxlength="20" class="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-muted-orange focus:outline-none text-sm" />
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-semibold text-warm-text mb-1">分機</label>
+                  <input id="empExt" type="text" maxlength="20" class="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-muted-orange focus:outline-none text-sm" />
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-xs font-semibold text-warm-text mb-1">Email</label>
+                  <input id="empEmail" type="email" maxlength="60" class="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-muted-orange focus:outline-none text-sm" />
+                </div>
+              </div>
+              <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                <input id="lotteryConsent" type="checkbox" class="mt-0.5 w-4 h-4 accent-[#F4A261]" />
+                <span class="text-[11px] text-sub-text leading-relaxed">我同意提供上述個人資料作為本次抽獎之聯絡與資格核對使用，僅限主辦單位、不對外公開。</span>
+              </label>
+            </div>
+          </div>
+
           <button id="submitShareBtn" class="btn-primary w-full" disabled>送出分享</button>
           <p id="shareHint" class="text-center text-[11px] text-sub-text/70">填寫稱呼與留言，並勾選同意後即可送出</p>
         </div>
@@ -297,7 +331,24 @@
     // ════════════════════════════════════════════════════════════
     //  留言牆設定：Google Apps Script 網頁應用程式網址
     // ════════════════════════════════════════════════════════════
-    const WALL_API_URL = 'https://script.google.com/macros/s/AKfycbxoY-aDVPSx4X5X5tPC5ACSMHKSvZTEcAKNb_fIRW_8t6sp3fTD9NZJQjr6w0iWJuA/exec';
+    const WALL_API_URL = 'https://script.google.com/macros/s/AKfycbxdpG3vcRXpROSQ7sZo_y81QaSdpuCiyqvw6JRYtQoLSEx7dktDpoWmy8pKbyavGoY/exec';
+
+    // ════════════════════════════════════════════════════════════
+    //  院內同仁抽獎開關（一次性活動用）
+    //    LOTTERY_OPEN     = true 時，分享表單才會出現抽獎報名區；活動結束改成 false 即整段消失。
+    //    LOTTERY_DEADLINE = 設日期（YYYY-MM-DD）後，超過當天會自動關閉；不想用就設成 ''。
+    // ════════════════════════════════════════════════════════════
+    const LOTTERY_OPEN = true;
+    const LOTTERY_DEADLINE = '';   // 例：'2026-07-31'；留空字串表示不設截止日
+
+    function lotteryActive() {
+      if (!LOTTERY_OPEN) return false;
+      if (LOTTERY_DEADLINE) {
+        const end = new Date(LOTTERY_DEADLINE + 'T23:59:59');
+        if (!isNaN(end.getTime()) && new Date() > end) return false;
+      }
+      return true;
+    }
 
     // ── 初心價值（不分區，自行選擇）──────────────────────────
     const palette = [
@@ -535,11 +586,22 @@
     const shareMsgEl   = document.getElementById('shareMessage');
     const shareConsent = document.getElementById('shareConsent');
     const submitShare  = document.getElementById('submitShareBtn');
+    // 抽獎相關元素
+    const lotterySection = document.getElementById('lotterySection');
+    const joinLottery    = document.getElementById('joinLottery');
+    const lotteryFields  = document.getElementById('lotteryFields');
+    const empName  = document.getElementById('empName');
+    const empId    = document.getElementById('empId');
+    const empExt   = document.getElementById('empExt');
+    const empEmail = document.getElementById('empEmail');
+    const lotteryConsent = document.getElementById('lotteryConsent');
 
     function openShare() {
       const items = getSelectedItems();
       document.getElementById('shareValuesPreview').innerHTML =
         '你今天的初心：' + items.map(it => `<span class="font-bold text-warm-text">【${esc(it.name)}】</span>`).join('、');
+      // 依開關決定是否顯示抽獎報名區
+      lotterySection.classList.toggle('hidden', !lotteryActive());
       document.getElementById('shareForm').classList.remove('hidden');
       document.getElementById('shareSuccess').classList.add('hidden');
       shareModal.classList.remove('hidden');
@@ -551,7 +613,11 @@
       if (document.getElementById('cardModal').classList.contains('hidden')) document.body.style.overflow = '';
     }
     function validateShare() {
-      const ok = shareNameEl.value.trim() && shareMsgEl.value.trim() && shareConsent.checked;
+      let ok = shareNameEl.value.trim() && shareMsgEl.value.trim() && shareConsent.checked;
+      // 若勾選參加抽獎，需另外填妥姓名、人事號並同意個資使用
+      if (lotteryActive() && joinLottery.checked) {
+        ok = ok && empName.value.trim() && empId.value.trim() && lotteryConsent.checked;
+      }
       submitShare.disabled = !ok;
     }
 
@@ -564,6 +630,13 @@
       document.getElementById('msgCount').textContent = shareMsgEl.value.length;
       validateShare();
     });
+    // 抽獎報名：勾選後展開欄位
+    joinLottery.addEventListener('change', () => {
+      lotteryFields.classList.toggle('hidden', !joinLottery.checked);
+      validateShare();
+    });
+    [empName, empId, empExt, empEmail].forEach(el => el.addEventListener('input', validateShare));
+    lotteryConsent.addEventListener('change', validateShare);
 
     let submitting = false;
     submitShare.addEventListener('click', async () => {
@@ -577,12 +650,19 @@
       submitShare.innerHTML = '<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>送出中…';
 
       const items = getSelectedItems();
+      const joining = lotteryActive() && joinLottery.checked;
       const payload = {
         name: shareNameEl.value.trim(),
         message: shareMsgEl.value.trim(),
         values: items.map(it => it.name),
         sentence: items.map(it => `【${it.name}】`).join('、'),
-        date: todayText()
+        date: todayText(),
+        // 抽獎報名資料（只存後台、不公開）；未報名則為空
+        joinLottery: joining ? '是' : '',
+        empName:  joining ? empName.value.trim()  : '',
+        empId:    joining ? empId.value.trim()    : '',
+        empExt:   joining ? empExt.value.trim()   : '',
+        empEmail: joining ? empEmail.value.trim() : ''
       };
       try {
         // no-cors：Apps Script 回應會轉址導致 CORS 讀取被擋，
@@ -614,4 +694,3 @@
   </script>
 </body>
 </html>
-                                                                                                                                                                                   
