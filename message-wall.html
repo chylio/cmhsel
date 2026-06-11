@@ -102,13 +102,13 @@
   <nav class="bg-white/95 backdrop-blur-sm border-b border-amber-100 sticky top-0 z-50 shadow-sm">
     <div class="max-w-7xl mx-auto px-6 sm:px-10">
       <div class="flex items-center justify-between h-20">
-        <a href="index-static.html" class="flex items-center gap-4 group">
+        <a href="index.html" class="flex items-center gap-4 group">
           <img src="./public/chimei-logo.png" alt="奇美醫療財團法人奇美醫院" class="h-12 w-auto object-contain" />
           <div class="hidden sm:block h-8 w-px bg-gray-200"></div>
           <span class="hidden sm:block font-semibold text-warm-text text-lg leading-tight">SEL<span class="text-muted-orange">學習小棧</span></span>
         </a>
         <div class="hidden md:flex items-center gap-2">
-          <a href="index-static.html"     class="px-5 py-2.5 rounded-full text-base font-medium text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
+          <a href="index.html"     class="px-5 py-2.5 rounded-full text-base font-medium text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
           <a href="abilities.html"        class="px-5 py-2.5 rounded-full text-base font-medium text-sub-text hover:bg-amber-50 hover:text-warm-text">SEL五大能力</a>
           <a href="selfcheck.html"        class="px-5 py-2.5 rounded-full text-base font-medium text-sub-text hover:bg-amber-50 hover:text-warm-text">自我檢測</a>
           <a href="scenario.html"         class="px-5 py-2.5 rounded-full text-base font-medium text-sub-text hover:bg-amber-50 hover:text-warm-text">情境應用</a>
@@ -222,67 +222,4 @@
           <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-dashed border-amber-200">
             <span style="font-size:13px;">🖊️</span>
             <span class="text-[13px] font-semibold" style="color:#8B5E34;">${esc(item.name)}</span>
-          </div>
-        </div>`;
-    }
-
-    function updateCountAndButton() {
-      const c = document.getElementById('wallCount');
-      c.textContent = `目前顯示最新 ${offset} 則，共 ${total} 則`;
-      c.classList.remove('hidden');
-      document.getElementById('moreWrap').classList.toggle('hidden', offset >= total);
-    }
-
-    async function loadPage() {
-      if (loadingPage) return;
-      if (WALL_API_URL.indexOf('PASTE_YOUR') === 0) { show('notConfigured'); return; }
-      loadingPage = true;
-      const moreBtn = document.getElementById('loadMoreBtn');
-      const firstLoad = (offset === 0);
-      if (!firstLoad) { moreBtn.disabled = true; moreBtn.textContent = '載入中…'; }
-
-      try {
-        const url = `${WALL_API_URL}?limit=${PAGE_SIZE}&offset=${offset}&t=${Date.now()}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const list = data.list || [];
-        total = (typeof data.total === 'number') ? data.total : (offset + list.length);
-
-        if (firstLoad && list.length === 0) { show('empty'); loadingPage = false; return; }
-
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('wall').classList.remove('hidden');
-
-        const html = list.map(cardHTML).join('');
-        document.getElementById('wall').insertAdjacentHTML('beforeend', html);
-        offset += list.length;
-
-        setColumns();
-        updateCountAndButton();
-      } catch (err) {
-        console.error(err);
-        if (firstLoad) show('error');
-        else alert('載入更多失敗，請稍後再試。');
-      } finally {
-        loadingPage = false;
-        moreBtn.disabled = false;
-        moreBtn.textContent = '載入更多';
-      }
-    }
-
-    function resetAndLoad() {
-      offset = 0; total = 0;
-      document.getElementById('wall').innerHTML = '';
-      document.getElementById('wall').classList.add('hidden');
-      document.getElementById('moreWrap').classList.add('hidden');
-      document.getElementById('wallCount').classList.add('hidden');
-      show('loading');
-      loadPage();
-    }
-
-    document.getElementById('loadMoreBtn').addEventListener('click', loadPage);
-
-    resetAndLoad();
-  </script>
-</body>
-</html>
+          </
