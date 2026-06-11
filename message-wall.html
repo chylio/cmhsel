@@ -185,9 +185,9 @@
     // ════════════════════════════════════════════════════════════
     const WALL_API_URL = 'https://script.google.com/macros/s/AKfycbxdpG3vcRXpROSQ7sZo_y81QaSdpuCiyqvw6JRYtQoLSEx7dktDpoWmy8pKbyavGoY/exec';
 
-    const PAGE_SIZE = 60;   // 每次載入則數
-    let offset = 0;         // 已載入到第幾則
-    let total = 0;          // 總則數
+    const PAGE_SIZE = 60;
+    let offset = 0;
+    let total = 0;
     let loadingPage = false;
 
     function setColumns() {
@@ -222,4 +222,67 @@
           <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-dashed border-amber-200">
             <span style="font-size:13px;">🖊️</span>
             <span class="text-[13px] font-semibold" style="color:#8B5E34;">${esc(item.name)}</span>
-          </
+          </div>
+        </div>`;
+    }
+
+    function updateCountAndButton() {
+      const c = document.getElementById('wallCount');
+      c.textContent = `目前顯示最新 ${offset} 則，共 ${total} 則`;
+      c.classList.remove('hidden');
+      document.getElementById('moreWrap').classList.toggle('hidden', offset >= total);
+    }
+
+    async function loadPage() {
+      if (loadingPage) return;
+      if (WALL_API_URL.indexOf('PASTE_YOUR') === 0) { show('notConfigured'); return; }
+      loadingPage = true;
+      const moreBtn = document.getElementById('loadMoreBtn');
+      const firstLoad = (offset === 0);
+      if (!firstLoad) { moreBtn.disabled = true; moreBtn.textContent = '載入中…'; }
+
+      try {
+        const url = `${WALL_API_URL}?limit=${PAGE_SIZE}&offset=${offset}&t=${Date.now()}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const list = data.list || [];
+        total = (typeof data.total === 'number') ? data.total : (offset + list.length);
+
+        if (firstLoad && list.length === 0) { show('empty'); loadingPage = false; return; }
+
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('wall').classList.remove('hidden');
+
+        const html = list.map(cardHTML).join('');
+        document.getElementById('wall').insertAdjacentHTML('beforeend', html);
+        offset += list.length;
+
+        setColumns();
+        updateCountAndButton();
+      } catch (err) {
+        console.error(err);
+        if (firstLoad) show('error');
+        else alert('載入更多失敗，請稍後再試。');
+      } finally {
+        loadingPage = false;
+        moreBtn.disabled = false;
+        moreBtn.textContent = '載入更多';
+      }
+    }
+
+    function resetAndLoad() {
+      offset = 0; total = 0;
+      document.getElementById('wall').innerHTML = '';
+      document.getElementById('wall').classList.add('hidden');
+      document.getElementById('moreWrap').classList.add('hidden');
+      document.getElementById('wallCount').classList.add('hidden');
+      show('loading');
+      loadPage();
+    }
+
+    document.getElementById('loadMoreBtn').addEventListener('click', loadPage);
+
+    resetAndLoad();
+  </script>
+</body>
+</html>
