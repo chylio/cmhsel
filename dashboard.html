@@ -676,8 +676,11 @@
       const freq = new Map();
       rows.forEach(r => r.values.forEach(v => freq.set(v, (freq.get(v) || 0) + 1)));
       const ranked = [...freq.entries()].sort((a, b) => b[1] - a[1]);
-      document.getElementById('wallTopValue').textContent = ranked.length ? '【' + ranked[0][0] + '】' : '–';
-      document.getElementById('wallTopValueSub').textContent = ranked.length ? '被選了 ' + ranked[0][1] + ' 次' : '此範圍內沒有留言';
+      const topTied = ranked.length ? ranked.filter(([, n]) => n === ranked[0][1]) : [];
+      document.getElementById('wallTopValue').textContent =
+        topTied.length ? topTied.map(([v]) => '【' + v + '】').join('') : '–';
+      document.getElementById('wallTopValueSub').textContent =
+        topTied.length ? (topTied.length > 1 ? '各' : '') + '被選了 ' + ranked[0][1] + ' 次' : '此範圍內沒有留言';
 
       // 每週留言數
       const box = document.getElementById('wallTrendChart');
