@@ -112,6 +112,16 @@
     table.data th { color: var(--sub-text); font-weight: 600; }
 
     .footer-note { font-size: 0.75rem; color: var(--sub-text); margin: 1.5rem 0 2.5rem; text-align: center; }
+
+    .sec-title { font-size: 1.05rem; font-weight: 700; margin: 1.75rem 0 0.9rem; }
+    .hbar-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+    .hbar-label { flex: 0 0 4.5em; font-size: 0.82rem; color: var(--warm-text); text-align: right; }
+    .hbar-track { flex: 1; }
+    .hbar-fill {
+      height: 18px; border-radius: 4px; background: var(--muted-orange);
+      min-width: 2px; transition: width 0.3s;
+    }
+    .hbar-count { flex: 0 0 3em; font-size: 0.8rem; color: var(--sub-text); }
   </style>
 </head>
 
@@ -206,6 +216,40 @@
           </div>
         </section>
       </div>
+
+      <!-- ───── 初心留言牆 ───── -->
+      <h2 class="sec-title">💌 初心留言牆</h2>
+      <section class="kpis">
+        <div class="card">
+          <div class="kpi-label">累積留言</div>
+          <div class="kpi-value" id="wallTotal">–</div>
+          <div class="kpi-sub">全部期間</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">篩選範圍內新增</div>
+          <div class="kpi-value" id="wallRecent">–</div>
+          <div class="kpi-sub" id="wallRecentSub">–</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">最常被選的初心</div>
+          <div class="kpi-value" id="wallTopValue" style="font-size:1.5rem;">–</div>
+          <div class="kpi-sub" id="wallTopValueSub">–</div>
+        </div>
+      </section>
+
+      <div class="grid2">
+        <section class="card chart-card">
+          <h3>每週留言數</h3>
+          <div class="hint">分享意願的變化，也是團隊心理安全感的參考指標</div>
+          <div class="chart-box" id="wallTrendChart"></div>
+        </section>
+
+        <section class="card chart-card">
+          <h3>初心價值排行</h3>
+          <div class="hint">留言時選擇的初心關鍵詞次數（篩選範圍內）</div>
+          <div id="wallValuesChart"></div>
+        </section>
+      </div>
     </div>
 
     <p class="footer-note">
@@ -235,7 +279,22 @@
 
     // ================== 資料層 ==================
     let ALL = [];          // [{date:'2026-07-19', hour:14, score:3}]
+    let WALL = [];         // [{date:'2026-06-25', values:['合作','成長']}]
     let rangeDays = 30;
+
+    // 留言牆的 date 欄是顯示用字串（如「2026.06.25　星期四」），抽出年月日
+    function parseWallList(list) {
+      const out = [];
+      for (const item of (list || [])) {
+        const m = String(item.date || '').match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+        if (!m) continue;
+        out.push({
+          date: m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0'),
+          values: Array.isArray(item.values) ? item.values : []
+        });
+      }
+      return out;
+    }
 
     function parseCSV(text) {
       const out = [];
@@ -317,6 +376,21 @@
       return series;
     }
 
+    function demoWall() {
+      const vals = ['合作', '成長', '專業', '感謝', '關懷', '看見', '價值', '傳承'];
+      const out = [];
+      const today = new Date();
+      for (let d = 59; d >= 0; d--) {
+        const day = new Date(today); day.setDate(today.getDate() - d);
+        const n = Math.random() < 0.55 ? 0 : 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) {
+          const picked = [...vals].sort(() => Math.random() - 0.5).slice(0, 1 + Math.floor(Math.random() * 3));
+          out.push({ date: fmtDate(day), values: picked });
+        }
+      }
+      return out;
+    }
+
     // ================== 載入與渲染 ==================
     async function loadData() {
       const meta = document.getElementById('metaInfo');
@@ -324,9 +398,14 @@
       try {
         if (DEMO) {
           ALL = demoData();
+          WALL = demoWall();
         } else {
-          const res = await fetch(MOOD_API_URL + '?type=mood&t=' + Date.now());
-          ALL = parseCSV(await res.text());
+          const [moodRes, wallRes] = await Promise.all([
+            fetch(MOOD_API_URL + '?type=mood&t=' + Date.now()).then(r => r.text()),
+            fetch(MOOD_API_URL + '?t=' + Date.now()).then(r => r.json()).catch(() => null)
+          ]);
+          ALL = parseCSV(moodRes);
+          WALL = parseWallList(wallRes && wallRes.list);
         }
         ALL.sort((a, b) => a.date < b.date ? -1 : 1);
         meta.textContent = (DEMO ? '⚠️ 示範資料 · ' : '') + '共 ' + ALL.length + ' 筆 · 更新於 ' +
@@ -338,7 +417,7 @@
     }
 
     function renderAll() {
-      const has = ALL.length > 0;
+      const has = ALL.length > 0 || WALL.length > 0;
       document.getElementById('emptyBox').style.display = has ? 'none' : '';
       document.getElementById('content').style.display = has ? '' : 'none';
       if (!has) return;
@@ -348,6 +427,7 @@
       renderWeekday();
       renderHours();
       renderTable();
+      renderWall();
     }
 
     // ---------- KPI ----------
@@ -577,6 +657,85 @@
         labels.push(b.label); values.push(avg(rs.map(r => r.score))); counts.push(rs.length);
       }
       barChart('hourChart', labels, values, counts);
+    }
+
+    // ---------- 初心留言牆 ----------
+    function wallInRange() {
+      if (!rangeDays) return WALL;
+      const from = addDays(todayStr(), -(rangeDays - 1));
+      return WALL.filter(r => r.date >= from);
+    }
+
+    function renderWall() {
+      const rows = wallInRange();
+
+      // KPI
+      document.getElementById('wallTotal').textContent = WALL.length || '–';
+      document.getElementById('wallRecent').textContent = rows.length;
+      document.getElementById('wallRecentSub').textContent = rangeDays ? '近 ' + rangeDays + ' 天' : '全部期間';
+      const freq = new Map();
+      rows.forEach(r => r.values.forEach(v => freq.set(v, (freq.get(v) || 0) + 1)));
+      const ranked = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+      document.getElementById('wallTopValue').textContent = ranked.length ? '【' + ranked[0][0] + '】' : '–';
+      document.getElementById('wallTopValueSub').textContent = ranked.length ? '被選了 ' + ranked[0][1] + ' 次' : '此範圍內沒有留言';
+
+      // 每週留言數
+      const box = document.getElementById('wallTrendChart');
+      box.innerHTML = '';
+      if (!rows.length) {
+        box.innerHTML = '<div class="empty">此範圍內沒有留言</div>';
+      } else {
+        const byWeek = groupBy(rows, r => mondayOf(r.date));
+        const weeks = [...byWeek.keys()].sort().slice(-10);
+        const counts = weeks.map(w => byWeek.get(w).length);
+        const maxV = Math.max(...counts);
+
+        const W = 520, H = 240, L = 36, R = 8, T = 20, B = 30;
+        const iw = W - L - R, ih = H - T - B;
+        const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H });
+        const yMax = Math.max(4, Math.ceil(maxV * 1.15));
+        const y = v => T + ih - v / yMax * ih;
+        const bw = Math.min(46, iw / weeks.length * 0.55);
+
+        const tickStep = Math.max(1, Math.ceil(yMax / 4));
+        for (let v = 0; v <= yMax; v += tickStep) {
+          svg.appendChild(svgEl('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: '#F3EBDD', 'stroke-width': 1 }));
+          const t = svgEl('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 10, fill: '#9CA3AF' });
+          t.textContent = v; svg.appendChild(t);
+        }
+
+        weeks.forEach((wk, i) => {
+          const cx = L + (i + 0.5) * iw / weeks.length;
+          const c = counts[i];
+          const rect = svgEl('rect', {
+            x: cx - bw / 2, y: y(c), width: bw, height: T + ih - y(c),
+            rx: 4, fill: '#52B5A0'
+          });
+          rect.addEventListener('mousemove', e => showTip('<b>' + wk.slice(5).replace('-', '/') + ' 當週</b><br/>' + c + ' 則留言', e.clientX, e.clientY));
+          rect.addEventListener('mouseleave', hideTip);
+          svg.appendChild(rect);
+          const vt = svgEl('text', { x: cx, y: y(c) - 6, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: '#3D3D3D' });
+          vt.textContent = c; svg.appendChild(vt);
+          const t = svgEl('text', { x: cx, y: H - 8, 'text-anchor': 'middle', 'font-size': 10, fill: '#9CA3AF' });
+          t.textContent = wk.slice(5).replace('-', '/'); svg.appendChild(t);
+        });
+        box.appendChild(svg);
+      }
+
+      // 初心價值排行（水平長條）
+      const vbox = document.getElementById('wallValuesChart');
+      if (!ranked.length) {
+        vbox.innerHTML = '<div class="empty">此範圍內沒有留言</div>';
+      } else {
+        const top = ranked.slice(0, 8);
+        const maxN = top[0][1];
+        vbox.innerHTML = top.map(([name, n]) =>
+          '<div class="hbar-row">' +
+            '<div class="hbar-label">' + name + '</div>' +
+            '<div class="hbar-track"><div class="hbar-fill" style="width:' + Math.max(4, n / maxN * 100) + '%"></div></div>' +
+            '<div class="hbar-count">' + n + ' 次</div>' +
+          '</div>').join('');
+      }
     }
 
     // ---------- 數據表 ----------
