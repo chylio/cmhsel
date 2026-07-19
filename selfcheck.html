@@ -173,7 +173,7 @@
   <nav class="bg-white/95 backdrop-blur-sm border-b border-amber-100 sticky top-0 z-50 shadow-sm">
     <div class="max-w-7xl mx-auto px-6 sm:px-10">
       <div class="flex items-center justify-between h-20">
-        <a href="index.html" class="flex items-center gap-4 group">
+        <a href="index-static.html" class="flex items-center gap-4 group">
           <img src="./public/chimei-logo.png" alt="奇美醫療財團法人奇美醫院" class="h-12 w-auto object-contain" />
           <div class="hidden sm:block h-8 w-px bg-gray-200"></div>
           <span class="hidden sm:block font-semibold text-warm-text text-lg leading-tight">
@@ -182,7 +182,7 @@
         </a>
 
         <div class="hidden md:flex items-center gap-2">
-          <a href="index.html"     class="px-5 py-2.5 rounded-full text-base font-medium transition-all duration-200 text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
+          <a href="index-static.html"     class="px-5 py-2.5 rounded-full text-base font-medium transition-all duration-200 text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
           <a href="abilities.html"        class="px-5 py-2.5 rounded-full text-base font-medium transition-all duration-200 text-sub-text hover:bg-amber-50 hover:text-warm-text">SEL五大能力</a>
           <a href="selfcheck.html"        class="px-5 py-2.5 rounded-full text-base font-medium transition-all duration-200 bg-soft-orange text-muted-orange font-semibold">自我檢測</a>
           <a href="scenario.html"         class="px-5 py-2.5 rounded-full text-base font-medium transition-all duration-200 text-sub-text hover:bg-amber-50 hover:text-warm-text">情境應用</a>
@@ -200,7 +200,7 @@
       </div>
 
       <div id="mobileMenu" class="md:hidden pb-4 pt-2 border-t border-amber-50 hidden">
-        <a href="index.html"     class="block w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-1 text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
+        <a href="index-static.html"     class="block w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-1 text-sub-text hover:bg-amber-50 hover:text-warm-text">首頁</a>
         <a href="abilities.html"        class="block w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-1 text-sub-text hover:bg-amber-50 hover:text-warm-text">SEL五大能力</a>
         <a href="selfcheck.html"        class="block w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-1 bg-soft-orange text-muted-orange font-semibold">自我檢測</a>
         <a href="scenario.html"         class="block w-full text-left px-4 py-3 rounded-xl text-sm font-medium mb-1 text-sub-text hover:bg-amber-50 hover:text-warm-text">情境應用</a>
@@ -392,6 +392,7 @@
           selected = stressLevelData.find(b => b.id === id);
           renderBuns();
           renderResult();
+          queueMoodReport();
           setTimeout(() => {
             document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
           }, 100);
@@ -457,6 +458,48 @@
       `;
       resultEl.classList.remove('hidden');
     }
+
+    // ========== 匿名情緒溫度回傳（靜默送出，不影響畫面） ==========
+    // 只送「壓力分數」一個數字：1=今天很輕鬆 … 5=壓力大爆炸（與卡片「n分」標示一致）。
+    // 同一裝置一天只送一次；使用者在 1.5 秒內改選會以最後的選擇為準。
+    const MOOD_API_URL = 'https://script.google.com/macros/s/AKfycby_T7yVbj6Pyr2fZ09CeSWBo0vGKtFqYpG4AFFP-Caf2ddZqFGb195JGCk0rZtayms/exec';
+    const MOOD_SENT_KEY = 'sel-mood-sent-date';
+    let moodTimer = null;
+
+    function todayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function moodAlreadySent() {
+      try { return localStorage.getItem(MOOD_SENT_KEY) === todayStr(); } catch (_) { return false; }
+    }
+
+    function queueMoodReport() {
+      if (!selected || moodAlreadySent()) return;
+      clearTimeout(moodTimer);
+      moodTimer = setTimeout(sendMoodReport, 1500);
+    }
+
+    function sendMoodReport() {
+      if (!selected || moodAlreadySent()) return;
+      const stress = 6 - selected.score; // 壓力分數：1=輕鬆、5=大爆炸
+      try {
+        fetch(MOOD_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          keepalive: true,
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type: 'mood', score: stress })
+        });
+        localStorage.setItem(MOOD_SENT_KEY, todayStr());
+      } catch (_) {}
+    }
+
+    // 使用者選完就關頁面時，把還在等待的分數立即送出
+    window.addEventListener('pagehide', () => {
+      if (moodTimer) { clearTimeout(moodTimer); sendMoodReport(); }
+    });
 
     // 初始渲染
     renderBuns();
