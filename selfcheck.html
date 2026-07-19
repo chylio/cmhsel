@@ -461,28 +461,19 @@
 
     // ========== 匿名情緒溫度回傳（靜默送出，不影響畫面） ==========
     // 只送「壓力分數」一個數字：1=今天很輕鬆 … 5=壓力大爆炸（與卡片「n分」標示一致）。
-    // 同一裝置一天只送一次；使用者在 1.5 秒內改選會以最後的選擇為準。
-    const MOOD_API_URL = 'https://script.google.com/macros/s/AKfycby_T7yVbj6Pyr2fZ09CeSWBo0vGKtFqYpG4AFFP-Caf2ddZqFGb195JGCk0rZtayms/exec';
-    const MOOD_SENT_KEY = 'sel-mood-sent-date';
+    // 每次選定就送一筆；1.5 秒內改選以最後的選擇為準，不限制送出次數。
+    const MOOD_API_URL = 'https://script.google.com/macros/s/AKfycbxdpG3vcRXpROSQ7sZo_y81QaSdpuCiyqvw6JRYtQoLSEx7dktDpoWmy8pKbyavGoY/exec';
     let moodTimer = null;
 
-    function todayStr() {
-      const d = new Date();
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    }
-
-    function moodAlreadySent() {
-      try { return localStorage.getItem(MOOD_SENT_KEY) === todayStr(); } catch (_) { return false; }
-    }
-
     function queueMoodReport() {
-      if (!selected || moodAlreadySent()) return;
+      if (!selected) return;
       clearTimeout(moodTimer);
       moodTimer = setTimeout(sendMoodReport, 1500);
     }
 
     function sendMoodReport() {
-      if (!selected || moodAlreadySent()) return;
+      moodTimer = null;
+      if (!selected) return;
       const stress = 6 - selected.score; // 壓力分數：1=輕鬆、5=大爆炸
       try {
         fetch(MOOD_API_URL, {
@@ -492,7 +483,6 @@
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ type: 'mood', score: stress })
         });
-        localStorage.setItem(MOOD_SENT_KEY, todayStr());
       } catch (_) {}
     }
 
